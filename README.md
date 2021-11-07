@@ -1,0 +1,1 @@
+Manually downloading lots of images is really annoying.
