@@ -6,9 +6,9 @@ from PIL import Image
 import io
 
 class ImageDownloader:
-    def __init__(self):
-        self.PATH = 'C:\Program Files (x86)\chromedriver.exe'
-        self.driver = webdriver.Chrome(self.PATH)
+    def __init__(self, webdriver_path):
+        self.webdriver_path = webdriver_path
+        self.driver = webdriver.Chrome(self.webdriver_path)
     
     def download_image(self, url, path, filename):
         try:
