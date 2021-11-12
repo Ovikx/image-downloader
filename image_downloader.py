@@ -1,28 +1,50 @@
+from requests.models import Response
+from requests.sessions import session
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-import requests
 from PIL import Image
 import io
+import aiohttp
+import asyncio
 
 class ImageDownloader:
     def __init__(self, webdriver_path):
         self.webdriver_path = webdriver_path
-        self.driver = webdriver.Chrome(self.webdriver_path)
+        self.options = webdriver.ChromeOptions()
+        self.options.add_argument('headless')
+        self.driver = webdriver.Chrome(self.webdriver_path, options=self.options)
     
-    def download_image(self, url, path, filename):
-        try:
-            image_file = io.BytesIO(requests.get(url).content)
-            image = Image.open(image_file)
-            with open(f'{path}/{filename}', 'wb') as f:
-                try:
-                    image.save(f, 'JPEG')
-                except:
-                    image.save(f, 'PNG')
-        except Exception as e:
-            print(f'DOWNLOAD FAILED - {e}')
+    async def download_task(self, url_data):
+        async with aiohttp.ClientSession() as session:
+            tasks = []
+            for url, path, filename in url_data:
+                task = asyncio.ensure_future(self.retrieve_image(session, url, path, filename))
+                tasks.append(task)
 
+            files = await asyncio.gather(*tasks)
+            for image_file, path, filename in files:
+                try:
+                    if image_file == None:
+                        continue
+                    image = Image.open(image_file)
+                    with open(f'{path}/{filename}', 'wb') as f:
+                        try:
+                            image.save(f, 'JPEG')
+                        except:
+                            image.save(f, 'PNG')
+                except Exception as e:
+                    print(f'DOWNLOAD FAILED for {filename}- {e}')
     
+    async def retrieve_image(self, session, url, path, filename):
+        try:
+            async with session.get(url, timeout=5) as response:
+                image_file = io.BytesIO(await response.content.read())
+                return (image_file, path, filename)
+        except:
+            print(f'TIMEOUT - {filename}')
+            return (None, None, None)
+
     def download_images(self, query, limit, path):
         self.driver.get('https:images.google.com')
         search_bar = self.driver.find_element_by_name('q')
@@ -46,7 +68,7 @@ class ImageDownloader:
 
         self.driver.quit()
 
-        for i, url in enumerate(urls):
-            self.download_image(url, path, f'{query}{i+1}.jpg')
+        url_data = [(url, path, f'{query}{i+1}.jpg') for i, url in enumerate(urls)]
+        asyncio.run(self.download_task(url_data))
 
-        return urls
+        return url_data
