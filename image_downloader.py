@@ -5,6 +5,7 @@ from PIL import Image
 import io
 import aiohttp
 import asyncio
+from progress_bar import ProgressBar
 
 class ImageDownloader:
     def __init__(self, webdriver_path):
@@ -15,6 +16,7 @@ class ImageDownloader:
     
     async def download_task(self, url_data):
         async with aiohttp.ClientSession() as session:
+            print('Downloading images...')
             tasks = []
             for url, path, filename in url_data:
                 task = asyncio.ensure_future(self.retrieve_image(session, url, path, filename))
@@ -33,6 +35,7 @@ class ImageDownloader:
                             image.save(f, 'PNG')
                 except Exception as e:
                     print(f'DOWNLOAD FAILED for {filename}- {e}')
+            print('Images downloaded')
     
     async def retrieve_image(self, session, url, path, filename):
         try:
@@ -49,6 +52,7 @@ class ImageDownloader:
         search_bar.send_keys(query)
         search_bar.send_keys(Keys.RETURN)
         urls = set()
+        pb = ProgressBar(max_value=limit)
 
         while len(urls) < limit:
             thumbnails = self.driver.find_elements(By.CLASS_NAME, 'Q4LuWd')
@@ -60,7 +64,9 @@ class ImageDownloader:
                 expanded = self.driver.find_elements(By.CLASS_NAME, 'n3VNCb')
                 for image in expanded:
                     if image.get_attribute('src') and 'http' in image.get_attribute('src'):
+                        old_len = len(urls)
                         urls.add(image.get_attribute('src'))
+                        print(f'Search progress: {pb.update(len(urls)-old_len)} {len(urls)}/{limit} done', end='\r')
                 if len(urls) >= limit:
                     break
 
